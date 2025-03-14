@@ -10,11 +10,13 @@ passport.use(
     { usernameField: "email", passwordField: "password" },
     async (email, password, done) => {
       try {
+        // Normalizamos el email a minúsculas para evitar duplicados
+        const normalizedEmail = email.toLowerCase();
         // Buscar el usuario por email en Supabase
         const { data: users, error } = await supabase
           .from("users")
           .select("id, email, password, name, role")
-          .eq("email", email);
+          .eq("email", normalizedEmail);
         if (error) throw error;
         const user = users && users.length > 0 ? users[0] : null;
         if (!user) {
@@ -27,8 +29,7 @@ passport.use(
           // Contraseña incorrecta
           return done(null, false, { message: "Contraseña incorrecta" });
         }
-        // Autenticación exitosa:
-        // No exponemos el hash de password en el objeto usuario que vamos a guardar en sesión
+        // Autenticación exitosa: no exponemos el hash de password en el objeto usuario
         delete user.password;
         return done(null, user);
       } catch (err) {
@@ -49,15 +50,14 @@ passport.use(
     },
     async (_accessToken, _refreshToken, profile, done) => {
       try {
-        // El perfil de Google nos da la info del usuario
         const googleId = profile.id;
-        const email = profile.emails?.[0].value;
+        // Normalizamos el email a minúsculas
+        const email = profile.emails?.[0].value.toLowerCase();
         const name = profile.displayName || profile.name?.givenName;
-
         if (!email) {
           return done(null, false, { message: "No se obtuvo email de Google" });
         }
-        // Buscar si ya existe un usuario con ese email (o quizás guardar googleId)
+        // Buscar si ya existe un usuario con ese email
         const { data: users, error } = await supabase
           .from("users")
           .select("id, email, name, role, google_id")
@@ -65,23 +65,23 @@ passport.use(
         if (error) throw error;
         let user = users && users.length > 0 ? users[0] : null;
         if (!user) {
-          // Si no existe, crear un nuevo usuario en nuestra tabla 'users'
+          // Crear nuevo usuario con rol 'user'
           const { data, error: insertError } = await supabase
             .from("users")
             .insert([
               {
-                email: email,
-                name: name,
+                email,
+                name,
                 password: null, // no hay password porque viene de Google
                 role: "user",
                 google_id: googleId,
               },
             ])
-            .select(); // select() para obtener el registro insertado
+            .select();
           if (insertError) throw insertError;
           user = data ? data[0] : null;
         } else {
-          // Si existe pero no tenía google_id guardado, podríamos actualizarlo:
+          // Si existe pero no tenía google_id, lo actualizamos
           if (!user.google_id) {
             await supabase
               .from("users")
@@ -100,12 +100,10 @@ passport.use(
 
 // Serialización y deserialización de usuario para la sesión
 passport.serializeUser((user: any, done) => {
-  // Guardar en la sesión únicamente el ID del usuario
   done(null, user.id);
 });
 
 passport.deserializeUser(async (id: string, done) => {
-  // Al recibir el ID de la sesión, buscar el usuario en la base de datos
   try {
     const { data: users, error } = await supabase
       .from("users")

@@ -1,10 +1,6 @@
 import { Router } from "express";
 import { ensureAuth, ensureAdmin } from "../middlewares/authMiddleware";
-import {
-  createClass,
-  listClasses,
-  enrollClass,
-} from "../controllers/classcontroller";
+import { createClass, listClasses, enrollClass } from "../controllers/classController";
 
 const router = Router();
 

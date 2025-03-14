@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 
 export function ensureAuth(req: Request, res: Response, next: NextFunction) {
-  console.log("req.isAuthenticated:", req.isAuthenticated);
   if (typeof req.isAuthenticated === "function" && req.isAuthenticated()) {
     return next();
   }
@@ -17,7 +16,7 @@ export function ensureAdmin(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ error: "No autenticado" });
   }
   const user = req.user as any;
-  if (user?.role !== "admin") {
+  if (user?.role.toLowerCase() !== "admin") {
     return res
       .status(403)
       .json({ error: "Acceso denegado: se requiere rol admin" });
